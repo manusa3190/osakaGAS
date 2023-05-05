@@ -52,7 +52,7 @@ class Sheet {
 
   remove(id){
     const index = this.items.findIndex(item=>item[this.key列名] === id)
-    this.sheet.deleteRow()
+    this.sheet.deleteRow(index+2)
   }
 
   // 既存のアイテムを全て消し、新しいアイテムに置き換えます
