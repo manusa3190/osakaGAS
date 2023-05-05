@@ -51,8 +51,8 @@ class Sheet {
   }
 
   remove(id){
-    this.items = this.items.filter(item=>item[this.key列名]!==id)
-    this.renew(this.items)  
+    const index = this.items.findIndex(item=>item[this.key列名] === id)
+    this.sheet.deleteRow()
   }
 
   // 既存のアイテムを全て消し、新しいアイテムに置き換えます
