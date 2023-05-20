@@ -1,34 +1,39 @@
 class Sheet {
   constructor({sheetName,spreadsheetId,spreadsheetUrl,key列名}){
-    if(sheetName&&spreadsheetId){
-      this.sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName)
-    }else if(sheetName){
+    var spreadsheet;
+    if(spreadsheetId){
+      spreadsheet = SpreadsheetApp.openById(spreadsheetId)
+    }else if(spreadsheetUrl){
+      spreadsheet = SpreadsheetApp.openByUrl(spreadsheetUrl)
+    }else{
       try{
-        this.sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName)
-      }catch{
+        spreadsheet = SpreadsheetApp.getActiveSpreadsheet()
+      }catch(err){
         console.log('アクティブなスプレッドシートがありません。コンテナバインドでない可能性があります')
       }
-    }else if(spreadsheetId){
-      this.sheet = SpreadsheetApp.openById(spreadsheetId).getActiveSheet()
-    }else if(spreadsheetUrl){
-      this.sheet =  SpreadsheetApp.openByUrl(spreadsheetUrl).getActiveSheet()
+    }
+
+    if(sheetName){
+      this.sheet = spreadsheet.getSheetByName(sheetName)
     }else{
-      console.log('spreadsheetId、sheetName、spreadsheetUrlのいずれかを指定してください')
+      this.sheet = spreadsheet.getSheets()[0]
     }
 
     const rows=this.sheet.getDataRange().getValues()
     this.columns=rows.shift()
     this.values = rows
 
-    this.items = rows.map(row=>{
+    this.key列名 = key列名? key列名:this.columns[0]
+  }
+
+  get items(){
+    return this.values.map(row=>{
       return this.columns.reduce((item,columnName,idx)=>{
         // セルの値が';'を含んでいる場合は配列に変換する
         const value = /;/.test(row[idx])? row[idx].split(';'):row[idx]
         return Object.assign(item,{[columnName]:value})
       },{})
     })
-
-    this.key列名 = key列名? key列名:this.columns[0]
   }
 
   get docs(){
