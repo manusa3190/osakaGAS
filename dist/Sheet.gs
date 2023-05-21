@@ -19,11 +19,14 @@ class Sheet {
       this.sheet = spreadsheet.getSheets()[0]
     }
 
+    this.fetch()
+    this.key列名 = key列名? key列名:this.columns[0]
+  }
+
+  fetch(){
     const rows=this.sheet.getDataRange().getValues()
     this.columns=rows.shift()
     this.values = rows
-
-    this.key列名 = key列名? key列名:this.columns[0]
   }
 
   get items(){
