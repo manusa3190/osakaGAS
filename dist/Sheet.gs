@@ -48,8 +48,14 @@ class Sheet {
   setItem(item){
     const index = this.items.findIndex(e=>e[this.key列名]===item[this.key列名])
     const newRow = this.columns.map(colName=>{
+      let value = item[colName]
       // セルに入れる値。配列であればセミコロン;で区切った文字列にする
-      return Array.isArray(item[colName])? item[colName].join(';'):item[colName]
+      if(Array.isArray(value))value = value.join(';')
+        
+      // Date型に変換可能な文字列（yyyy-mm-dd）であればDate型にする
+      if(/(1|2)\d{3}-\d{2}-\d{2}/.test(value))value = new Date(value)
+
+      return value
     })
     if(index<0){
       this.sheet.appendRow(newRow)

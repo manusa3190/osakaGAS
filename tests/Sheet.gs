@@ -66,13 +66,22 @@ const シート編集テスト=()=>{
     return newシート.docs.CASTLE001.名前
   }
 
+  const dateSetTest=()=>{
+    const sampleRecord = シート.docs.CASTLE001
+    シート.setItem(JSON.parse(JSON.stringify(sampleRecord)))
 
+    const newシート = new Sheet({})
+    return newシート.docs.CASTLE001.設立年月日
+  }
 
   try{
     test(setItemTest,'松本城2')
+    test(dateSetTest,new Date(1594,5,1))
   }catch(err){
     console.log(err)
   }finally{
     シート.renew(シート.items)
   }
 }
+
+
