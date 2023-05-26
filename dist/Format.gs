@@ -33,7 +33,7 @@ class Format {
 
     const values = this.作成管理sheet.getDataRange().getValues()
     const columns = values.shift();
-    this.key列名 = key列名 ? key列名 : columns[0]
+    this.key列名 = key列名 ? key列名 : columns[0];
     // 列名に'updatedAt',​'spreadsheetURL'​,'pdfID',​'pdfURL'があるかチェック
     ['updatedAt', 'spreadsheetURL', 'pdfID', 'pdfURL'].forEach(colName => {
       if (!columns.includes(colName)) {
@@ -43,25 +43,29 @@ class Format {
     })
 
     this.作成管理items = values.map(row => {
-      return this.columns.reduce((item, colName, idx) => {
+      return columns.reduce((item, colName, idx) => {
         return Object.assign(item, { [colName]: row[idx] })
       }, {})
     })
   }
 
-  _ひな型からインデックスを取り出し() {
-    const ひな型values = this.ひな型sheet.getDataRange().getValues()
+  static getIndexes(sheet){
+    const values = sheet.getDataRange().getValues()
     let indexes = { 'keyName': [0, 0] }
     indexes = {}
-    ひな型values.forEach((ひな型row, rowIdx) => {
-      ひな型row.forEach((ひな型value, colIdx) => {
-        if (/^\$.+/.test(ひな型value)) {
-          const keyName = ひな型value.replace('$', '')
+    values.forEach((row, rowIdx) => {
+      row.forEach((value, colIdx) => {
+        if (/^\$.+/.test(value)) {
+          const keyName = value.replace('$', '')
           indexes[keyName] = [rowIdx, colIdx]
         }
       })
     })
-    return indexes
+    const reversedIndexes ={}
+    for(const key of Object.keys(indexes).reverse()){
+      reversedIndexes[key] = indexes[key]
+    }
+    return reversedIndexes
   }
 
   _スプシフォーマットとデータの値に違いがあるか(data, spreadsheetURL) {
@@ -69,7 +73,7 @@ class Format {
 
     // スプシフォーマットから値を取得
     const スプシフォーマットvalues = SpreadsheetApp.openByUrl(spreadsheetURL).getDataRange().getValues()
-    const indexes = this._ひな型からインデックスを取り出し()
+    const indexes = Format.getIndexes(this.ひな型sheet)
     const スプシフォーマットitem = Object.entries(indexes).reduce((item, [key, [rowIdx, colIdx]]) => {
       return Object.assign(item, { [key]: スプシフォーマットvalues[rowIdx][colIdx] })
     }, {})
@@ -89,15 +93,36 @@ class Format {
     return newSS.getUrl()
   }
 
+  _スプシフォーマットに行を挿入(スプシフォーマットURL,data){
+    const スプシフォーマットsheet = SpreadsheetApp.openByUrl(スプシフォーマットURL).getActiveSheet()
+    const indexes = Format.getIndexes(スプシフォーマットsheet)
+    Object.entries(indexes).forEach(([key,position])=>{
+      if(Array.isArray(data[key])){
+        スプシフォーマットsheet.insertRowsBefore(position[0]+1,data[key].length-1)
+        スプシフォーマットsheet.getRange(position[0]+1,position[1]+1).setValue('$'+key)
+        スプシフォーマットsheet.getRange(position[0]+data[key].length,position[1]+1).setValue('')
+      }
+    })
+  }
+
   _スプシフォーマットに値をセット(スプシフォーマットURL,data) {
     const スプシフォーマットsheet = SpreadsheetApp.openByUrl(スプシフォーマットURL).getActiveSheet()
     const スプシフォーマットrange = スプシフォーマットsheet.getDataRange()
     const スプシフォーマットvalues = スプシフォーマットrange.getValues()
     const スプシフォーマットformulas = スプシフォーマットrange.getFormulas()
-    const indexes = this._ひな型からインデックスを取り出し()
+
+    const indexes = Format.getIndexes(スプシフォーマットsheet)
     Object.entries(indexes).forEach(([key, [rowIdx, colIdx]]) => {
-      スプシフォーマットvalues[rowIdx][colIdx] = data[key]
-    })
+      if(Array.isArray(data[key])){
+        data[key].forEach((row,i)=>{
+          スプシフォーマットvalues[rowIdx+i].splice(colIdx,row.length,...row)
+        })
+      }else{
+        スプシフォーマットvalues[rowIdx][colIdx] = data[key]        
+      }
+
+    }) 
+
     スプシフォーマットrange.setValues(スプシフォーマットvalues)
     // 数式が入ってあったセルは、数式を上書き
     スプシフォーマットformulas.forEach((row,i)=>{
