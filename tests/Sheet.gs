@@ -1,13 +1,3 @@
-const test=(functionName,expect)=>{
-  const _ = LodashGS.load()
-  const res = functionName()
-  if(_.isEqual(res,expect)){
-    return
-  }else{
-    throw `${functionName.name}でエラー`
-  }
-}
-
 const シート取得テスト=()=>{
   const コンテナバインド_シート1test=()=>{
     const シート = new Sheet({})
@@ -83,5 +73,4 @@ const シート編集テスト=()=>{
     シート.renew(シート.items)
   }
 }
-
 

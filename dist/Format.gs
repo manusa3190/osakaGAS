@@ -1,43 +1,62 @@
 class Format {
-  constructor({ ひな型ID, 管理用sheet, key列名, スプシ格納フォルダ, pdf格納フォルダ }) {
-    this.p = PropertiesService.getScriptProperties()
-    this.ひな型ID = ひな型ID
-    this.sheet = 管理用sheet
-    const values = this.sheet.getDataRange().getValues()
-    this.columns = values.shift();
+  constructor({ ひな型sheet, データsheet, 作成管理sheet, key列名, スプシ格納フォルダ, pdf格納フォルダ }) {
+
+    if(!スプシ格納フォルダ){
+      console.log('生成したスプレッドシートを格納するフォルダを指定してください。{スプシ格納フォルダ:Folder}')
+      throw null
+    }
+    this.スプシ格納フォルダ = スプシ格納フォルダ
+
+    if(!pdf格納フォルダ){
+      console.log('生成したpdfを格納するフォルダを指定してください。{pdf格納フォルダ:Folder}')
+      throw null
+    }    
+    this.pdf格納フォルダ = pdf格納フォルダ
+
+    if(!ひな型sheet){
+      console.log('ひな型sheetを指定してください。{ひな型sheet:Sheet}')
+      throw null
+    }
+    this.ひな型sheet = ひな型sheet
+
+    if(!データsheet){
+      console.log('書き込むデータを記載しているスプレッドシートを指定してください。{データsheet:String}')
+      throw null 
+    } 
+    this.データsheet = データsheet
+
+    if(!作成管理sheet){
+      console.log('作成管理用のスプレッドシートを指定してください。{作成管理sheet:Sheet}')
+      throw null       
+    }
+    this.作成管理sheet = 作成管理sheet
+
+    const values = this.作成管理sheet.getDataRange().getValues()
+    const columns = values.shift();
+    this.key列名 = key列名 ? key列名 : columns[0]
     // 列名に'updatedAt',​'spreadsheetURL'​,'pdfID',​'pdfURL'があるかチェック
     ['updatedAt', 'spreadsheetURL', 'pdfID', 'pdfURL'].forEach(colName => {
-      if (!this.columns.includes(colName)) {
+      if (!columns.includes(colName)) {
         console.log(`${colName}がありません。列を付け加えてください`)
         throw null
       }
     })
-    this.key列名 = key列名 ? key列名 : this.columns[0]
 
-    this.items = values.map(row => {
+    this.作成管理items = values.map(row => {
       return this.columns.reduce((item, colName, idx) => {
         return Object.assign(item, { [colName]: row[idx] })
       }, {})
     })
-
-    this.スプシ格納フォルダ = スプシ格納フォルダ
-    this.pdf格納フォルダ = pdf格納フォルダ
-  }
-
-  get docs() {
-    return this.items.reduce((docs, item) => {
-      return Object.assign(docs, { [item[this.key列名]]: item })
-    }, {})
   }
 
   _ひな型からインデックスを取り出し() {
-    const ひな型values = SpreadsheetApp.openById(this.ひな型ID).getActiveSheet().getDataRange().getValues()
+    const ひな型values = this.ひな型sheet.getDataRange().getValues()
     let indexes = { 'keyName': [0, 0] }
     indexes = {}
     ひな型values.forEach((ひな型row, rowIdx) => {
       ひな型row.forEach((ひな型value, colIdx) => {
-        if (/^<.+>$/.test(ひな型value)) {
-          const keyName = ひな型value.replace('<', '').replace('>', '')
+        if (/^\$.+/.test(ひな型value)) {
+          const keyName = ひな型value.replace('$', '')
           indexes[keyName] = [rowIdx, colIdx]
         }
       })
@@ -62,22 +81,12 @@ class Format {
     })
   }
 
-  _スプシフォーマットからpdfを作成(spreadsheetURL,newFileName) {
-    const スプシフォーマット = SpreadsheetApp.openByUrl(spreadsheetURL)
-    const newPdfBlob = スプシフォーマット.getAs('application/pdf')
-    newPdfBlob.setName(newFileName || スプシフォーマット.getName())
-    const newPdfFile = DriveApp.createFile(newPdfBlob)
-    newPdfFile.moveTo(this.pdf格納フォルダ)
-    return { pdfID: newPdfFile.getId(), pdfURL: newPdfFile.getUrl() }
-  }
-
   _ひな型をコピーしてスプシフォーマットを作成(newFileName) {
-    const newFile = DriveApp
-      .getFileById(this.ひな型ID)
-      .makeCopy()
-      .moveTo(this.スプシ格納フォルダ)
-      .setName(newFileName || data[this.key列名])
-    return newFile.getUrl()
+    const newSS = SpreadsheetApp.create(newFileName || data[this.key列名])
+    this.ひな型sheet.copyTo(newSS)
+    newSS.deleteActiveSheet()
+    DriveApp.getFileById(newSS.getId()).moveTo(this.スプシ格納フォルダ)
+    return newSS.getUrl()
   }
 
   _スプシフォーマットに値をセット(スプシフォーマットURL,data) {
@@ -98,8 +107,16 @@ class Format {
         }
       })
     })
-    
   }
+
+  _スプシフォーマットからpdfを作成(スプシフォーマットURL,newFileName) {
+    const スプシフォーマット = SpreadsheetApp.openByUrl(スプシフォーマットURL)
+    const newPdfBlob = スプシフォーマット.getAs('application/pdf')
+    newPdfBlob.setName(newFileName || スプシフォーマット.getName())
+    const newPdfFile = DriveApp.createFile(newPdfBlob)
+    newPdfFile.moveTo(this.pdf格納フォルダ)
+    return { pdfID: newPdfFile.getId(), pdfURL: newPdfFile.getUrl() }
+  }  
 
   _setValueToColumn(rowIndex, columnName, value) {
     if(rowIndex<0){
@@ -111,29 +128,28 @@ class Format {
     ).setValue(value)
   }
 
-  データからスプシフォーマットの作成だけ実行(data, newFileName) {
+  スプシフォーマット作成のみ実行(data, newFileName) {
     const スプシフォーマットURL = this._ひな型をコピーしてスプシフォーマットを作成(newFileName)
     this._スプシフォーマットに値をセット(スプシフォーマットURL, data)
 
     // 管理表にupdatedAtやspreadsheetURLをセット
-    const rowIndex = Object.keys(this.docs).findIndex(key=>key===data[this.key列名])
+    const rowIndex = this.作成管理items.findIndex(item=>item[this.key列名]===data[this.key列名])
     this._setValueToColumn(rowIndex, 'updatedAt', new Date())
     this._setValueToColumn(rowIndex, 'spreadsheetURL', スプシフォーマットURL)
   }
 
-  スプシフォーマットからpdfの作成だけ実行(spreadsheetURL,newFileName) {
+  pdf作成のみ実行(spreadsheetURL,newFileName) {
     const { pdfID, pdfURL } = this._スプシフォーマットからpdfを作成(spreadsheetURL,newFileName)
 
     // 管理表にupdatedAtやspreadsheetURLをセット
-    const rowIndex = this.items.findIndex(item => item.spreadsheetURL === spreadsheetURL)
+    const rowIndex = this.作成管理items.findIndex(item => item.spreadsheetURL === spreadsheetURL)
     this._setValueToColumn(rowIndex, 'updatedAt', new Date())
     this._setValueToColumn(rowIndex, 'pdfID', pdfID)
     this._setValueToColumn(rowIndex, 'pdfURL', pdfURL)
   }
 
-
   スプシフォーマット更新とpdf作成の両方実行(data, newFileName) {
-    const { spreadsheetURL, pdfID } = this.docs[data[this.key列名]]
+    const { spreadsheetURL, pdfID } = this.作成管理items.find(item=>item[this.key列名]===data[this.key列名])
 
     // スプシフォーマットとデータの値に違いがなければ、処理は進めない
     if (!this._スプシフォーマットとデータの値に違いがあるか(data, spreadsheetURL)) {
