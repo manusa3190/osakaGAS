@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <!-- tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style type="text/tailwindcss">
+    h1 {@apply text-3xl}
+    h2 {@apply text-2xl}
+    h3 {@apply text-xl}
+
+    button {@apply bg-blue-500 rounded-lg text-center text-white active:opacity-60}
+    input {@apply border px-1 py-0.5}
+    </style>
+  </head>
+  <body>
+    <div id="vue-app"></div>
+
+    <!-- vue3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+      const {defineComponent,ref,reactive, computed, onMounted, watch} = Vue
+
+      const app = defineComponent({
+        async setup(){
+          return {}
+        },
+        template:`
+          <div>
+          </div>
+        `
+      })
+
+      Vue.createApp({
+        components:{app},
+        template:`<Suspense><app /></Suspense>`
+      }).mount('#vue-app')
+    </script>
+
+  </body>
+</html>
