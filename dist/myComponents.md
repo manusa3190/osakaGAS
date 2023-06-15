@@ -35,37 +35,64 @@
 ```js
       const TableFormatter = defineComponent({
         props:{columns:Array},
-        emits:['change'],
-        setup(props,{emit}){
-          const message = ref('aaa')
+        setup(props,{emit,expose}){
+          const textValue = ref('')
+          
+          const message = ref('')
 
-          const validate=(val)=>{
-            const values = val.split('\n').map(row=>row.split('\t'))
+          const items = computed(()=>{
+            if(!textValue.value)return []
+
+            const values = textValue.value.split('\n').map(row=>row.split('\t'))
             const header = values.shift()
             if(!Array.isArray(header)){
               message.value='テーブルデータを貼り付けてください'
             }
-            
-            const columns = props.columns || header
-            
-            const items = values.map(row=>{
-              return columns.reduce((item,colName,idx)=>{
+                        
+            const raw_items = values.map(row=>{
+              return header.reduce((item,colName,idx)=>{
                 return Object.assign(item,{[colName]:row[idx]})
               },{})
             })
 
-            emit('change',items)
+            if(!props.columns){
+              return row_items
+            }else{
+              return raw_items.map(item=>{
+                return props.columns.reduce((acc,colName)=>{
+                  return Object.assign(acc,{[colName]:item[colName]})
+                },{})
+              })
+            }
+          })
 
-          }
+          const columns = computed(()=>{
+            return items.value.length? Object.keys(items.value[0]):[]
+          })
 
-          return {message,validate}
+          return {textValue,message,columns,items}
         },
         template:`
         <div>
-          <div class=" text-lg font-bold"><slot></slot></div>
-          <textarea @change="validate($event.target.value)"
-          class="w-full"
-          ></textarea>
+          <textarea v-model="textValue" class="w-full"></textarea>
+
+          <table class="text-xs w-full my-3" :hidden="!items.length">
+            <tr>
+              <th v-for="colName of columns">{{colName}}</th>
+            </tr>
+
+            <tr v-for="item of items.slice(0,5)">
+              <td v-for="colName of columns">
+                <div>{{ item[colName] }}</div>
+              </td>
+            </tr>
+          </table>
+
+          <div class="flex space-x-3">
+            <slot name="default" :items="items"></slot>
+            <button @click="textValue=''">クリア</button>          
+          </div>
+
           <div class=" text-xs text-red-300"> {{ message }}</div>
         </div>
         `
