@@ -5,12 +5,19 @@
     <!-- tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style type="text/tailwindcss">
+    body {@apply p-3 bg-slate-800 text-white}
     h1 {@apply text-3xl}
     h2 {@apply text-2xl}
     h3 {@apply text-xl}
+    h4 {@apply text-sm font-bold}
 
-    button {@apply bg-blue-500 rounded-lg text-center text-white active:opacity-60}
-    input {@apply border px-1 py-0.5}
+    button {@apply bg-blue-600 rounded-lg text-center text-white px-3 py-1 hover:opacity-80 active:opacity-60}
+    input,textarea {@apply bg-transparent border rounded px-1 py-0.5}
+    textarea {@apply text-sm}
+
+    table {@apply whitespace-nowrap border-2 border-slate-100 }
+    th {@apply font-semibold}
+    td {@apply border border-slate-300}
     </style>
   </head>
   <body>
