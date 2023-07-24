@@ -47,7 +47,7 @@ class Template {
     const newSS = SpreadsheetApp.create(newFileName || ひな形sheet.getName())
     ひな型sheet.copyTo(newSS)
     newSS.deleteActiveSheet()
-    DriveApp.getFileById(newSS.getId()).moveTo(格納フォルダ)
+    DriveApp.getFileById(newSS.getId()).moveTo(格納folder)
     return newSS
   }
 
