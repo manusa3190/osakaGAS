@@ -36,15 +36,15 @@ class Template {
     },{})
   }
 
-  static ひな型をコピーしてスプシフォーマットを作成(ひな形sheet=SpreadsheetApp.getActiveSheet(),newFileName,格納folder) {
-    if(!ひな形sheet){
-      throw 'ひな形sheetを指定してください'
+  static ひな型をコピーしてスプシフォーマットを作成(ひな型sheet=SpreadsheetApp.getActiveSheet(),newFileName,格納folder) {
+    if(!ひな型sheet){
+      throw 'ひな型sheetを指定してください'
     }
     if(!格納フォルダ){
       throw '格納folderを指定してください'
     }
 
-    const newSS = SpreadsheetApp.create(newFileName || ひな形sheet.getName())
+    const newSS = SpreadsheetApp.create(newFileName || ひな型sheet.getName())
     ひな型sheet.copyTo(newSS)
     newSS.deleteActiveSheet()
     DriveApp.getFileById(newSS.getId()).moveTo(格納folder)
