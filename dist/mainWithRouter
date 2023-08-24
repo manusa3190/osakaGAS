@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <!-- tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style type="text/tailwindcss">
+    body {@apply p-3 bg-slate-800 text-white}
+    h1 {@apply text-3xl}
+    h2 {@apply text-2xl}
+    h3 {@apply text-xl}
+    h4 {@apply text-sm font-bold}
+
+    button {@apply bg-blue-600 rounded-lg text-center text-white px-3 py-1 hover:opacity-80 active:opacity-60}
+    input,textarea {@apply bg-transparent border rounded px-1 py-0.5}
+    textarea {@apply text-sm}
+
+    table {@apply whitespace-nowrap border-2 border-slate-100 bg-transparent text-black}
+    th {@apply font-semibold}
+    td {@apply border border-slate-300}
+    </style>
+
+    <!-- gridjs -->
+    <link href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
+
+    <!--google chart-->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  </head>
+  <body>
+    <div id="vue-app"></div>
+
+    <!-- vue3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- vue-router -->
+    <script src="https://unpkg.com/vue-router@4"></script>
+
+    <!-- gridjs -->
+    <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+
+    
+    <script>
+      const {defineComponent,ref,reactive, computed, onMounted, watch} = Vue
+      const { useRoute, useRouter, createRouter, createWebHashHistory} = VueRouter
+
+      const docs = ref({})
+
+    const fetch =()=> new Promise((resolve,reject)=>{
+	        var google
+	        // 本番環境（GASで動作している時）ではgoogleがオブジェクトとして意味を持つので、google.script.runが走る
+	        if(google){
+	            google.script.run
+	                .withSuccessHandler(res=>{
+										docs.value = JSON.parse(res)
+										resolve(null)
+									)
+	                .getData(dataName)
+	        }else{
+	            // 開発環境（ローカルで走らせている時）は、googleが実体を持たないので、こちらでデータを取得。取得先は開発用GAS
+	            // https://script.google.com/home/projects/1pT2AyY7tHrilce5ICaRJjTaVojXjkX4TL2uDqB87_g7w9o2QWn4pcfxX/edit
+	            const URL = "https://script.google.com/macros/s/AKfycbyyrP4-TMr-A989_u4No8pu1cANj6MIsp0ya1hM70BTqnS6M1lI2CASVayCUAJ6vvzQ0w/exec"
+	            const {data} = await axios.get(`${URL}?dataName=${dataName}`)
+	
+	            resolve(data)
+	        }
+      })
+
+      const index = defineComponent({
+        async setup(){
+					const items = computed(()=>Object.values(docs.value))
+
+          return {items}
+        },
+        template:`
+        {{items}}
+        `
+      })
+
+      const show = defineComponent({
+        setup(){
+          const route = useRoute()
+          console.log(route)
+          const id = route.params.id
+          const name = route.name
+
+          const doc = docs.value[id]
+
+          return {doc}
+        },
+        template:`
+        {{doc}}
+        `
+      })
+
+      const app = defineComponent({
+        setup(){
+
+          return {}
+        },
+        template:`
+          <nav class="flex justify-between border-b-2 py-2">
+            <div class="flex">
+              <svg v-if="$route.path!='/'" @click="$router.push('/')"
+               xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 hover:bg-gray-400 rounded-full">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+
+              <div>{{ $route.name}}</div>
+            </div>
+
+            <div>
+            </div>
+          </nav>
+
+          <RouterView v-slot="{ Component }">
+            <template v-if="Component">
+                  <Suspense>
+                    <component :is="Component"></component>
+
+                    <template #fallback> Loading...</template> 
+                  </Suspense>
+            </template>
+          </RouterView>
+        `
+      })
+
+      const router = VueRouter.createRouter({
+        history: VueRouter.createWebHashHistory(),
+        routes:[
+          { path: '/', name:'ダッシュボード', component: index },
+          { path: '/:id', name:'詳細', component: show },
+        ]
+      })
+
+      Vue.createApp({
+        components:{app},
+        template:`<app />`
+        })
+        .use(router)
+        .mount('#vue-app')
+    </script>
+
+  </body>
+</html>
