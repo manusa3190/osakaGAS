@@ -1,23 +1,27 @@
 class Template {
-  static 値を埋め込む座標を取得(sheet,anchor='$'){
-    const values = sheet.getDataRange().getValues()
-    let indexes = { 'keyName': [0, 0] }
-    indexes = {}
-    values.forEach((row, rowIdx) => {
-      row.forEach((value, colIdx) => {
-        if (/^\$.+/.test(value)) {
-          const keyName = value.replace('$', '')
-          indexes[keyName] = [rowIdx, colIdx]
-        }
-      })
-    })
-    const reversedIndexes ={}
-    for(const key of Object.keys(indexes).reverse()){
-      reversedIndexes[key] = indexes[key]
-    }
-    return reversedIndexes
+  static isSheet(obj){
+    return obj && typeof obj.getDataRange === 'function';
   }
 
+  static セル値とアドレスを取得(sheet){ //-> {value:[rowIdx,colIdx]}
+    if(!Template.isSheet(sheet)){
+      console.log('「セル値とアドレスを取得」にSheetが渡されませんでした')
+    }
+
+    const addresses = {}
+
+    const values = sheet.getDataRange().getValues()
+    values.forEach((row, rowIdx) => {
+      row.forEach((value, colIdx) => {
+          if(!value)return
+          addresses[value] = [rowIdx,colIdx]
+      })
+    })
+
+    return addresses
+  }
+
+  // 削除予定
   static スプシフォーマットの値を取得(sheet, coordinates={'anchorName':[0,0]}) {
     if (!sheet){
       throw 'スプレッドシートが指定されていません'
@@ -37,10 +41,10 @@ class Template {
   }
 
   static ひな型をコピーしてスプシフォーマットを作成(ひな型sheet=SpreadsheetApp.getActiveSheet(),newFileName,格納folder) {
-    if(!ひな型sheet){
-      throw 'ひな型sheetを指定してください'
+    if(!Template.isSheet(ひな型sheet)){
+      console.log('ひな型をコピーしてスプシフォーマットを作成でSheetが渡されませんでした')
     }
-    if(!格納フォルダ){
+    if(!格納folder){
       throw '格納folderを指定してください'
     }
 
@@ -51,6 +55,7 @@ class Template {
     return newSS
   }
 
+  // 削除予定
   static スプシフォーマットに行を挿入(スプシフォーマットURL,data){
     const スプシフォーマットsheet = SpreadsheetApp.openByUrl(スプシフォーマットURL).getActiveSheet()
     const indexes = Format.getIndexes(スプシフォーマットsheet)
@@ -63,24 +68,88 @@ class Template {
     })
   }
 
-  static スプシフォーマットに値をセット(sheet,coordinates,data) {
+  static スプシフォーマットの行追加とdataのフラット化(sheet=SpreadsheetApp.getActiveSheet(),data={}){
+      if(!Template.isSheet(sheet)){
+        console.log('「スプシフォーマットの行追加とdataのフラット化」で、Sheetが渡されませんでした')
+      }
 
+      // dataのうち、配列になっているデータはフラット化する。その際、スプシは行挿入する
+      const flattenData = {}
+      Object.entries(data).forEach(([key1,value1])=>{
+        if(Array.isArray(value1)){
 
+            value1.forEach((item,i)=>{
+
+              Object.entries(item).forEach(([key2,value2],j)=>{
+                const key = key1+'_'+key2 + (i? '_'+i:'')
+                flattenData[key] = value2
+
+                // ターゲットの位置を決めて、行挿入する
+                if(!j && !i){
+                  const addresses = Template.セル値とアドレスを取得(sheet)
+                  const targetAddress = addresses['$'+key]
+                  if(!targetAddress){
+                    console.log(`「スプシフォーマットの行追加とdataのフラット化」で${key}を入れる場所がありません`)
+                    return
+                  }
+                  const [rowIdx,colIdx] = targetAddress
+
+                  const 元となる行 = sheet.getRange(rowIdx+1,1,1,sheet.getLastColumn());
+                  [...Array(value1.length-1)].forEach((_,k)=>{
+                      sheet.insertRowAfter(rowIdx+k+1)
+                      const 挿入した行 = sheet.getRange(rowIdx+k+2,1,1,sheet.getLastColumn())
+                      元となる行.copyTo(挿入した行, SpreadsheetApp.CopyPasteType.PASTE_NORMAL,false)
+                      挿入した行.setValues(元となる行.getValues().map(e=>{
+                        return e.map(val=>val.startsWith('$')? val + '_' + (k+1):val)
+                      }))
+                  })
+                }
+              })
+            })
+
+        }else if(typeof(value1)==='string' || typeof(value1)==='number'){
+          flattenData[key1] = value1
+        }else{
+          console.log('プリミティブあるいは配列でないデータが渡されました')
+        }
+      })
+
+      return flattenData
+  }
+
+  static スプシフォーマットに値をセット(sheet=SpreadsheetApp.getActiveSheet(),data={}) {
+    // sheetが渡されているか確認
+    if(!Template.isSheet(sheet)){
+      console.log('「スプシフォーマットに値をセット」で、Sheetが渡されませんでした')
+    }
+
+    // dataがフラットであるか確認
+    Object.values(data).forEach(value=>{
+      if(Array.isArray(value)){
+        console.log('「スプシフォーマットに値をセット」で、フラット化されていないデータが渡されました')
+      }
+    })
+
+    // セルの値を取得
     const range = sheet.getDataRange()
     const values = range.getValues()
     const formulas = range.getFormulas()
 
-    Object.entries(coordinates).forEach(([key, [rowIdx, colIdx]]) => {
-      if(Array.isArray(data[key])){
-        data[key].forEach((row,i)=>{
-          values[rowIdx+i].splice(colIdx,row.length,...row)
-        })
-      }else{
-        values[rowIdx][colIdx] = data[key]        
-      }
-    }) 
+    // valuesにdataの値を割り当てる
+    const addresses = Template.セル値とアドレスを取得(sheet)
+    Object.entries(data).forEach(([key,val]) => {
+        const address = addresses['$'+key]
+        if(!address){
+          console.log(`${key}を入れる場所が見つかりません`)
+          return
+        }
+        const [rowIdx,colIdx] = address
+        values[rowIdx][colIdx] = val
+    })
 
+    // sheetに値をセット
     range.setValues(values)
+
     // 数式が入ってあったセルは、数式を上書き
     formulas.forEach((row,i)=>{
       row.forEach((formula,j)=>{
