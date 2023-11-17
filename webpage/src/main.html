@@ -10,9 +10,13 @@
     h3 {@apply text-xl}
     h4 {@apply text-sm font-bold}
 
-    button {@apply bg-blue-600 rounded-lg text-center text-white px-3 py-1 hover:opacity-80 active:opacity-60}
-    input,textarea {@apply bg-transparent border rounded px-1 py-0.5}
-    textarea {@apply text-sm}
+    button {@apply bg-blue-600 rounded-lg text-center text-white text-lg px-3 py-1 hover:opacity-80 active:opacity-60}
+
+    textarea{@apply border border-black w-full px-1 py-0.5 bg-yellow-100}
+    input {@apply px-1 py-0.5 bg-yellow-100 rounded-md}
+    select {@apply px-1 py-0.5 bg-white bg-yellow-100 border rounded-md}
+
+    svg {@apply p-1 w-10 mx-2 hover:cursor-pointer hover:bg-gray-200 active:bg-gray-300 self-center rounded-full}
 
     table {@apply whitespace-nowrap border-2 border-slate-100 bg-transparent text-black}
     th {@apply font-semibold}
@@ -41,7 +45,7 @@
 
       const {Grid,html,useSelector} = gridjs
 
-      const データ一覧 = reactive({})
+      var データ一覧 = {}
       const fetchデータ一覧=()=>new Promise((resolve)=>{
         google.script.run
           .withSuccessHandler(res=>{
@@ -59,11 +63,12 @@
     <?!= include('detail') ?>
 
     <script>
+
       const router = createRouter({
         history: createWebHashHistory(),
         routes:[
-          { path: '/', name:'一覧', component: index },
-          { path: '/:id', name:'詳細', component: detail },
+          { path: '/', name:'index', component: index },
+          { path: '/:id', name:'detail', component: detail },
         ]
       })
 
