@@ -1,0 +1,59 @@
+<template>
+  <h1>一覧</h1>
+
+  <div ref='データ一覧grid'></div>
+</template>
+
+<script>
+const index = defineComponent({
+  async setup(){
+    const router = useRouter()
+    const データ一覧grid = ref()
+
+    onMounted(()=>{
+      const grid = new Grid({
+        // columns: [
+        //   {
+        //     id:"品目id",
+        //     hidden:true
+        //   },{
+        //     name:"品名",
+        //     formatter:(cell,row)=>html(`<div class="text-end font-bold text-lg">${cell}</div>`)
+        //   }
+        // ],
+        data: Object.values(データ一覧),
+        style:{
+          tr:(row,rowIndex)=>{
+            return rowIndex === 1? {className:'selected'}:{}
+          }
+        },
+        className:{
+          th:'!p-1 text-center',
+          td:'!bg-inherit !py-0.5 text-center whitespace-nowrap',
+        },
+        // sort:true,
+        // search:true,
+        fixedHeader:true,
+        height:"800px"
+
+      }).render(データ一覧grid.value);
+
+      // 行をクリックすると詳細に飛ぶ
+      grid.on('rowClick',(...args) => {
+        const {cells} = args[1]
+        console.log(cells)
+        const データid = cells[0].data
+        router.push(String(データid))            
+      })
+    })
+
+    if(!Object.keys(データ一覧).length){
+      await fetchデータ一覧()
+    }
+
+    return {データ一覧grid}
+  },
+  template:'#index'
+})
+</script>
+
