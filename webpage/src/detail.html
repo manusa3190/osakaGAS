@@ -1,0 +1,53 @@
+<template>
+  <nav class="flex w-full">
+    <div class="flex-1"></div>
+
+    <div class="flex space-x-3">
+      <button v-if="isEdit" @click="createFeedback()">フィードバックシートを作成</button>
+      <button v-if="!isEdit" @click="isEdit=true">編集</button>
+      <button v-if="isEdit" @click="cansel()">キャンセル</button>
+      <button v-if="isEdit" @click="setデータ()">更新</button>
+    </div>
+  </nav>
+
+  <table>
+    <tr v-for="key of Object.keys(データ)">
+      <td>{{key}}</td>
+      <td>
+        <p v-if="!isEdit">{{データ[key]}}</p>
+        <input v-else v-model="データ[key]">
+      </td>
+    </tr>
+  </table>
+
+</template>
+
+<script>
+const detail = defineComponent({
+  setup(){
+    const router = useRouter()
+    const route = useRoute()
+    const id = route.params.id
+
+    const データ = ref({...データ一覧[id]})
+
+    // 編集する場合
+    const isEdit = ref(false)
+    function setデータ(){
+      google.script.run
+        .withSuccessHandlder((res)=>{          
+          router.push('/index')
+        })
+        .setデータ(データ)
+    }
+
+    function cansel(){
+      データ.value = {...データ一覧[id]}
+      isEdit.value = false
+    }
+
+    return {isEdit, データ, setデータ, cansel,}
+  },
+  template:'#detail'
+})
+</script>
