@@ -21,25 +21,6 @@ class Template {
     return addresses
   }
 
-  // 削除予定
-  static スプシフォーマットの値を取得(sheet, coordinates={'anchorName':[0,0]}) {
-    if (!sheet){
-      throw 'スプレッドシートが指定されていません'
-    }
-    const coordinatesの型判定 = Object.values(coordinates).every(c=>{
-      return Number.isInteger(c[0]) && Number.isInteger(c[0])
-    })
-    if(!coordinatesの型判定){
-      throw '座標の型が適切ではありません'
-    }
-
-    // スプシフォーマットから値を取得
-    const スプシフォーマットvalues = sheet.getDataRange().getValues()
-    return Object.entries(coordinates).reduce((item,[anchorName,[rowIdx,colIdx]])=>{
-      return Object.assign(item,{[anchorName]:スプシフォーマットvalues[rowIdx][colIdx]})
-    },{})
-  }
-
   static ひな型をコピーしてスプシフォーマットを作成(ひな型sheet=SpreadsheetApp.getActiveSheet(),newFileName,格納folder) {
     if(!Template.isSheet(ひな型sheet)){
       console.log('ひな型をコピーしてスプシフォーマットを作成でSheetが渡されませんでした')
@@ -55,57 +36,48 @@ class Template {
     return newSS
   }
 
-  // 削除予定
-  static スプシフォーマットに行を挿入(スプシフォーマットURL,data){
-    const スプシフォーマットsheet = SpreadsheetApp.openByUrl(スプシフォーマットURL).getActiveSheet()
-    const indexes = Format.getIndexes(スプシフォーマットsheet)
-    Object.entries(indexes).forEach(([key,position])=>{
-      if(Array.isArray(data[key])){
-        スプシフォーマットsheet.insertRowsBefore(position[0]+1,data[key].length-1)
-        スプシフォーマットsheet.getRange(position[0]+1,position[1]+1).setValue('$'+key)
-        スプシフォーマットsheet.getRange(position[0]+data[key].length,position[1]+1).setValue('')
-      }
-    })
-  }
-
   static スプシフォーマットの行追加とdataのフラット化(sheet=SpreadsheetApp.getActiveSheet(),data={}){
       if(!Template.isSheet(sheet)){
         console.log('「スプシフォーマットの行追加とdataのフラット化」で、Sheetが渡されませんでした')
       }
 
+      const sheetValues = sheet.getDataRange().getValues()
+
       // dataのうち、配列になっているデータはフラット化する。その際、スプシは行挿入する
       const flattenData = {}
-      Object.entries(data).forEach(([key1,value1])=>{
+      Object.entries(data).forEach(([key1,value1],i)=>{
         if(Array.isArray(value1)){
+            // 空配列の場合はデータのフラット化やスプシへの行挿入はしない
+            if(!value1.length)return
 
-            value1.forEach((item,i)=>{
-
-              Object.entries(item).forEach(([key2,value2],j)=>{
-                const key = key1+'_'+key2 + (i? '_'+i:'')
-                flattenData[key] = value2
-
-                // ターゲットの位置を決めて、行挿入する
-                if(!j && !i){
-                  const addresses = Template.セル値とアドレスを取得(sheet)
-                  const targetAddress = addresses['$'+key]
-                  if(!targetAddress){
-                    console.log(`「スプシフォーマットの行追加とdataのフラット化」で${key}を入れる場所がありません`)
-                    return
-                  }
-                  const [rowIdx,colIdx] = targetAddress
-
-                  const 元となる行 = sheet.getRange(rowIdx+1,1,1,sheet.getLastColumn());
-                  [...Array(value1.length-1)].forEach((_,k)=>{
-                      sheet.insertRowAfter(rowIdx+k+1)
-                      const 挿入した行 = sheet.getRange(rowIdx+k+2,1,1,sheet.getLastColumn())
-                      元となる行.copyTo(挿入した行, SpreadsheetApp.CopyPasteType.PASTE_NORMAL,false)
-                      挿入した行.setValues(元となる行.getValues().map(e=>{
-                        return e.map(val=>val.startsWith('$')? val + '_' + (k+1):val)
-                      }))
-                  })
-                }
+            // データのフラット化
+            value1.forEach((item,j)=>{
+              Object.entries(item).forEach(([key2,value2])=>{
+                flattenData[key1+'_'+key2+'_'+j] = value2
               })
             })
+
+            // スプシへの行挿入
+            const rowIdx = sheetValues.findIndex(row=>{
+              for(const key2 in value1[0]){
+                const key = '$'+ key1 + '_' + key2
+                if(row.includes(key))return true
+              }
+            });
+
+            const 元となる行 = sheet.getRange(rowIdx+1,1,1,sheet.getLastColumn());
+            [...Array(value1.length-1)].forEach((_,k)=>{
+                sheet.insertRowAfter(rowIdx+k+1)
+                const 挿入した行 = sheet.getRange(rowIdx+k+2,1,1,sheet.getLastColumn())
+                元となる行.copyTo(挿入した行, SpreadsheetApp.CopyPasteType.PASTE_NORMAL,false)
+            })
+
+            const 元となるvalues = 元となる行.getValues()[0]
+            // 挿入した行に値をセット。その際、最後に_0,_1などのインデックス番号をつける       
+            const newValues = Array(value1.length).fill().map((_,i)=>{
+              return 元となるvalues.map(val=>val? val+`_${i}`:val)
+            })
+            sheet.getRange(rowIdx+1,1,value1.length,sheet.getLastColumn()).setValues(newValues)
 
         }else if(typeof(value1)==='string' || typeof(value1)==='number'){
           flattenData[key1] = value1
@@ -179,11 +151,11 @@ class Template {
     // PDF出力のオプションを設定
     const options = 'exportFormat=pdf&format=pdf'
     + '&gid=' + sheet.getSheetId()  //PDFにするシートの「シートID」
-    + '&portrait=false'  //true(縦) or false(横)
+    + '&portrait=true'  //true(縦) or false(横)
     + '&size=A4'         //印刷サイズ
     + '&fitw=true'       //true(幅を用紙に合わせる) or false(原寸大)
     + '&gridlines=false' //グリッドラインの表示有無
-    + '&range=A1%3AO34'   //★POINT★セル範囲を指定。 %3A はコロン(:)を表す
+    + '&range=A1%3AK49'   //★POINT★セル範囲を指定。 %3A はコロン(:)を表す
 
     const requestUrl = url + options;
       
