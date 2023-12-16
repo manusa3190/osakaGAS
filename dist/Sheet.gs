@@ -1,22 +1,23 @@
 class Sheet {
-  constructor({sheetName,spreadsheetId,spreadsheetUrl,key列名}){
-    var spreadsheet;
-    if(spreadsheetId){
-      spreadsheet = SpreadsheetApp.openById(spreadsheetId)
+  constructor({spreadsheet,sheetName,spreadsheetId,spreadsheetUrl,key列名}){
+    if(spreadsheet){
+      this.spreadsheet = spreadsheet
+    }else if(spreadsheetId){
+      this.spreadsheet = SpreadsheetApp.openById(spreadsheetId)
     }else if(spreadsheetUrl){
-      spreadsheet = SpreadsheetApp.openByUrl(spreadsheetUrl)
+      this.spreadsheet = SpreadsheetApp.openByUrl(spreadsheetUrl)
     }else{
       try{
-        spreadsheet = SpreadsheetApp.getActiveSpreadsheet()
+        this.spreadsheet = SpreadsheetApp.getActiveSpreadsheet()
       }catch(err){
         console.log('アクティブなスプレッドシートがありません。コンテナバインドでない可能性があります')
       }
     }
 
     if(sheetName){
-      this.sheet = spreadsheet.getSheetByName(sheetName)
+      this.sheet = this.spreadsheet.getSheetByName(sheetName)
     }else{
-      this.sheet = spreadsheet.getSheets()[0]
+      this.sheet = this.spreadsheet.getSheets()[0]
     }
 
     this.fetch()
@@ -46,7 +47,6 @@ class Sheet {
   }
 
   setItem(item){
-    const index = this.items.findIndex(e=>e[this.key列名]===item[this.key列名])
     const newRow = this.columns.map(colName=>{
       let value = item[colName]
       // セルに入れる値。配列であればセミコロン;で区切った文字列にする
@@ -57,9 +57,18 @@ class Sheet {
 
       return value
     })
-    if(index<0){
+
+    const id = item[this.key列名]
+    if(!id || id==='new'){
+      var newId;
+      while(true){
+        newId = Utilities.getUuid().slice(0,8)
+        if(!Object.keys(this.docs).includes(newId))break;
+      }
+      item[this.key列名] = newId
       this.sheet.appendRow(newRow)
     }else{
+      const index = this.items.findIndex(e=>e[this.key列名]===item[this.key列名])
       this.sheet.getRange(index+2,1,1,this.columns.length).setValues([newRow])
     }
   }
