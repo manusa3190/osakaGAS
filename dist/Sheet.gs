@@ -1,23 +1,22 @@
 class Sheet {
-  constructor({spreadsheet,sheetName,spreadsheetId,spreadsheetUrl,key列名}){
-    if(spreadsheet){
-      this.spreadsheet = spreadsheet
-    }else if(spreadsheetId){
-      this.spreadsheet = SpreadsheetApp.openById(spreadsheetId)
+  constructor({sheetName,spreadsheetId,spreadsheetUrl,key列名}){
+    var spreadsheet;
+    if(spreadsheetId){
+      spreadsheet = SpreadsheetApp.openById(spreadsheetId)
     }else if(spreadsheetUrl){
-      this.spreadsheet = SpreadsheetApp.openByUrl(spreadsheetUrl)
+      spreadsheet = SpreadsheetApp.openByUrl(spreadsheetUrl)
     }else{
       try{
-        this.spreadsheet = SpreadsheetApp.getActiveSpreadsheet()
+        spreadsheet = SpreadsheetApp.getActiveSpreadsheet()
       }catch(err){
         console.log('アクティブなスプレッドシートがありません。コンテナバインドでない可能性があります')
       }
     }
 
     if(sheetName){
-      this.sheet = this.spreadsheet.getSheetByName(sheetName)
+      this.sheet = spreadsheet.getSheetByName(sheetName)
     }else{
-      this.sheet = this.spreadsheet.getSheets()[0]
+      this.sheet = spreadsheet.getSheets()[0]
     }
 
     this.fetch()
@@ -47,7 +46,7 @@ class Sheet {
   }
 
   setItem(item){
-    const newRow = this.columns.map(colName=>{
+    const itemToValues = (item) => this.columns.map(colName=>{
       let value = item[colName]
       // セルに入れる値。配列であればセミコロン;で区切った文字列にする
       if(Array.isArray(value))value = value.join(';')
@@ -59,17 +58,22 @@ class Sheet {
     })
 
     const id = item[this.key列名]
-    if(!id || id==='new'){
+    if(id===undefined)throw('idがundefinedとなっています')
+    if( id===null || id==='' || id==='new'){
       var newId;
       while(true){
         newId = Utilities.getUuid().slice(0,8)
         if(!Object.keys(this.docs).includes(newId))break;
       }
+
       item[this.key列名] = newId
-      this.sheet.appendRow(newRow)
+
+      this.sheet.appendRow(itemToValues(item))
+      return newId
     }else{
       const index = this.items.findIndex(e=>e[this.key列名]===item[this.key列名])
-      this.sheet.getRange(index+2,1,1,this.columns.length).setValues([newRow])
+      this.sheet.getRange(index+2,1,1,this.columns.length).setValues([itemToValues(item)])
+      return id
     }
   }
 
