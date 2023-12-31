@@ -1,22 +1,23 @@
 class Sheet {
-  constructor({sheetName,spreadsheetId,spreadsheetUrl,key列名}){
-    var spreadsheet;
-    if(spreadsheetId){
-      spreadsheet = SpreadsheetApp.openById(spreadsheetId)
+  constructor({spreadsheet,spreadsheetId,spreadsheetUrl, sheetName,key列名}){
+    if(spreadsheet){
+      this.spreadsheet = spreadsheet
+    }else if(spreadsheetId){
+      this.spreadsheet = SpreadsheetApp.openById(spreadsheetId)
     }else if(spreadsheetUrl){
-      spreadsheet = SpreadsheetApp.openByUrl(spreadsheetUrl)
+      this.spreadsheet = SpreadsheetApp.openByUrl(spreadsheetUrl)
     }else{
       try{
-        spreadsheet = SpreadsheetApp.getActiveSpreadsheet()
+        this.spreadsheet = SpreadsheetApp.getActiveSpreadsheet()
       }catch(err){
         console.log('アクティブなスプレッドシートがありません。コンテナバインドでない可能性があります')
       }
     }
 
     if(sheetName){
-      this.sheet = spreadsheet.getSheetByName(sheetName)
+      this.sheet = this.spreadsheet.getSheetByName(sheetName)
     }else{
-      this.sheet = spreadsheet.getSheets()[0]
+      this.sheet = this.spreadsheet.getSheets()[0]
     }
 
     this.fetch()
@@ -25,7 +26,7 @@ class Sheet {
 
   fetch(){
     const rows=this.sheet.getDataRange().getValues()
-    this.columns=rows.shift()
+    this.columns =rows.shift()
     this.values = rows
   }
 
