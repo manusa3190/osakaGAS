@@ -26,7 +26,8 @@ class Sheet {
 
   fetch(){
     const rows=this.sheet.getDataRange().getValues()
-    this.columns =rows.shift()
+    const colNames = rows.shift()
+    this.columns = colNames.map(colName=>colName.replaceAll(' '))
     this.values = rows
   }
 
