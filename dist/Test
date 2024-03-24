@@ -1,0 +1,60 @@
+// version 20240324
+
+class Test {
+  constructor(testName,sheets=[]){
+    this.datas = {}
+    sheets.forEach(sheet=>{ //このsheetは自作Sheetクラスのインスタンス
+      const spreadsheetId = sheet.spreadsheet.getId()
+      const sheetName = sheet.sheet.getName()
+      if(!this.datas[spreadsheetId])this.datas[spreadsheetId] = {}
+      this.datas[spreadsheetId][sheetName] = [sheet.columns,...sheet.values]
+    })
+
+    this.testName = testName
+    this.tests = []
+  }
+
+  setTest(description=String(), callback=Function(), option={reset:false,showResult:true}){
+    this.tests.push({description,callback,option})
+  }
+
+  reset(){
+    Object.entries(this.datas).forEach(([spreadsheetId,sheetDatas])=>{
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId)
+      Object.entries(sheetDatas).forEach(([sheetName,values])=>{
+        const sheet = spreadsheet.getSheetByName(sheetName)
+        if(!sheet)throw(`${sheetName}が見つかりません`)
+        sheet.clear() 
+        sheet.getRange(1,1,values.length,values[0].length).setValues(values)
+      })
+    })
+  }
+
+  execTests(){
+    function isEqual(val1,val2){
+      if(Array.isArray(val1) && Array.isArray(val1)){
+        return val1.some(v1=>val2.includes(v1)) && val2.some(v2=>val1.includes(v2))
+      }else if(['string','number'].includes(typeof(val1))){
+        return val1===val2
+      }else if(val1===null){
+        return val2===null
+      }
+    }
+
+    this.tests.forEach(({description,callback,option})=>{
+      const {expect,result} = callback()
+      const {reset,showResult} = option
+      if(isEqual(expect,result)){
+        console.log(description,'OK')
+      }else{
+        console.log(description,'NG')
+        if(showResult){
+          console.log(`  expect:${expect}`)
+          console.log(`  result:${result}`)
+        }
+      }
+
+      if(reset)this.reset()
+    })
+  }
+}
