@@ -38,10 +38,13 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- vue-router -->
     <script src="https://unpkg.com/vue-router@4"></script>
+    <!-- pinia -->
+    <script src="https://unpkg.com/pinia"></script>
     
     <script>
       const {defineComponent,ref,reactive, computed, onMounted, watch} = Vue
       const { useRoute, useRouter, createRouter, createWebHashHistory} = VueRouter
+      const { defineStore, createPinia } = Pinia;
 
       const {Grid,html,useSelector} = gridjs
 
