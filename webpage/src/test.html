@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+  </head>
+  <body>
+
+    <button onclick="getトランザクション仕様()">取得</button>
+
+    <button onclick="addトランザクション仕様()">追加</button>
+
+    <button onclick="updateトランザクション仕様()">更新</button>
+
+    <button onclick="deleteトランザクション仕様()">削除</button>
+
+    <button onclick="setトランザクション仕様()">セット</button>
+    
+  </body>
+
+  <script>
+    const getRows = async(tableName,query) => new Promise(async(resolve,reject)=>{
+      google.script.run
+        .withSuccessHandler(res=>{
+          res = JSON.parse(res)
+          const docs = res.reduce((acc,item)=>Object.assign(acc,{[item['Row ID']]:item}),{})
+          resolve(docs)
+        })
+        .withFailureHandler(err=>{
+          console.log(tableName,'Error:',err)
+          reject(err)
+        })
+        .getRows(tableName,query)      
+    })
+
+    const addRows = async(tableName,rows) => new Promise(async(resolve,reject)=>{
+      google.script.run
+        .withSuccessHandler(res=>{
+          const items = JSON.parse(res['Rows'])
+          const docs = items.reduce((acc,item)=>Object.assign(acc,{[item['Row ID']]:item}),{})
+          resolve(docs)
+        })
+        .withFailureHandler(err=>{
+          console.log(tableName,'Error:',err)
+          reject(err)
+        })
+        .addRows(tableName,rows)
+    })
+
+    const updateRows = async(tableName,rows) => new Promise(async(resolve,reject)=>{
+      google.script.run
+        .withSuccessHandler(res=>{
+          const items = JSON.parse(res['Rows'])
+          const docs = items.reduce((acc,item)=>Object.assign(acc,{[item['Row ID']]:item}),{})
+          resolve(docs)
+        })
+        .withFailureHandler(err=>{
+          console.log(tableName,'Error:',err)
+          reject(err)
+        })
+        .updateRows(tableName,rows)      
+    })
+
+    const deleteRows = async(tableName,rows) => new Promise(async(resolve,reject)=>{
+      google.script.run
+        .withSuccessHandler(res=>{
+          const items = JSON.parse(res['Rows'])
+          const docs = items.reduce((acc,item)=>Object.assign(acc,{[item['Row ID']]:item}),{})
+          resolve(docs)
+        })
+        .withFailureHandler(err=>{
+          console.log(tableName,'Error:',err)
+          reject(err)
+        })
+        .deleteRows(tableName,rows)      
+    })
+
+    const setRows = async(tableName,rows) => new Promise(async(resolve,reject)=>{
+      const newRows = []
+      const editRows = []
+      const removeRows = []
+
+      rows.forEach(row=>{
+        if(row['Row ID']==='new' && !row['setTrushed']){
+          newRows.push(row)
+        }else if(row['Row ID']!=='new' && row['setTrushed']){
+          removeRows.push(row)
+        }else{
+          editRows.push(row)
+        }
+      })
+
+      const [a,u,_] = await Promise.all([
+        addRows(tableName,newRows),
+        updateRows(tableName,editRows),
+        deleteRows(tableName,removeRows)
+      ])
+
+      return Object.assign(a,u)
+    })
+
+
+    async function addトランザクション仕様(){
+      const res = await addRows('仕様',[{仕様名:'aaa'},{仕様名:'bbb'}])
+      console.log('add',res)
+    }
+
+    async function getトランザクション仕様(){
+      const res = await getRows('仕様',['在庫単位名','IN',['メ－トル','キログラム']])
+      console.log('get',res)
+    }
+
+
+    async function updateトランザクション仕様(){
+      const res = await updateRows('仕様',[
+        {'Row ID':"96a5b43e-0e6f-4284-abdc-fe02ad9c6167",仕様名:'ddd'},
+        {'Row ID':"c4e829a2-f4bc-4fff-80ae-6bc1fe58852e",仕様名:'ccc'}
+      ])
+      console.log(res)
+    }
+
+    async function deleteトランザクション仕様(){
+      const res = await deleteRows('仕様',[
+        {'Row ID':"96a5b43e-0e6f-4284-abdc-fe02ad9c6167",仕様名:'ddd'},
+        {'Row ID':"c4e829a2-f4bc-4fff-80ae-6bc1fe58852e",仕様名:'ccc'}
+      ])
+      console.log(res)
+    }
+
+    async function setトランザクション仕様(){
+      const res = await setRows('仕様',[
+        {'Row ID':"new",仕様名:'eee'},
+        {'Row ID':"fa957501-0ab7-42db-9752-eebff5d6d275",setTrushed:true},
+        {'Row ID':"7d386ac5-e219-4188-9bfc-265cf76f8b69",仕様名:'fff'}
+      ])
+      console.log(res)
+    }
+
+  </script>
+</html>
