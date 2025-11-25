@@ -1,86 +1,264 @@
-// version 20241003
+// version 20251015
 
-const トランザクションspreadsheetId = ""
-const マスタspreadsheetId = ""
 
+// queryは必ず2次元配列
+const querySample1 = [['品目コード','==',12345]]
+const querySample2 = [['調査回名','==','2025年1回目'],['担当部署名','IN',['開発部,研究部']]]
+
+
+////////////////////////
+//      共通で使う      //
+////////////////////////
 const lock = LockService.getScriptLock()
 
-function getRows(sheetName="",query){
-  const spreadsheetId = sheetName.includes('マスタ')? マスタspreadsheetId:トランザクションspreadsheetId 
+function getColumnsAndItemsFromSheet(sheetName, spreadsheetId=""){
+  /* このGASはトランザクションv0.5にバインドされている。
+  引数にspreadsheetIdを指定しなければ、トランザクションv0.5からデータを引っ張る
+  */ 
+  const spreadsheet = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet()
 
-  const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName)
+  const sheet = spreadsheet.getSheetByName(sheetName)
   
   const values = sheet.getDataRange().getValues()
 
   const columns = values.shift()
 
-  let items = values.map(row=>columns.reduce((item,colName,idx)=>Object.assign(item,{[colName]:row[idx]}),{}))
+  const items = values.map(row=>columns.reduce((item,colName,idx)=>Object.assign(item,{[colName]:row[idx]}),{}))
 
-  if(query){
-    const [fieldName,operator,fieldValue] = query
-    switch(operator){
-      case "==":{
-        items=items.filter(item=>item[fieldName]==fieldValue)
-        break
+  return {sheet, values, columns, items:formatterToJS(items)}
+}
+
+function rollback(sheet, originalValues){
+  while(true){
+    try{
+      sheet.getRange(1,1,originalValues.length,originalValues[0].length).setValues(originalValues)
+      break
+    }catch(e){
+      continue
+    }
+  }
+}
+
+/**
+ * スプレッドシートに書き込む用に、コードやリストを文字列に変換します
+ */
+function formatterToSpreadsheet(objects){
+  if(!objects.length) return []
+
+  return objects.map( item => Object.fromEntries(
+    Object.entries(item).map( ([key,val]) =>{
+      if(key.endsWith('コード')){
+        return [key, String(val)]
       }
-      case "IN":{
-        if(Array.isArray(fieldValue)){
-          items=items.filter(item=>fieldValue.includes(item[fieldName]))
-        }else{
-          throw(`${tableName} getRows fieldValueが配列ではありません。fieldValue:${fieldValue}`)
-        }        
-        break
+      else if(key.endsWith('リスト') && Array.isArray(val)){
+        return [key, val.join(',')]
       }
+      else if(key==='更新日時'){
+        return [key, new Date()]
+      }
+      else{
+        return [key, val]
+      }
+    })
+  ))
+}
+
+/**
+ * スプレッドシートからデータを読みとった際に、コードを文字列、リストを配列に変換します
+ */
+function formatterToJS(items){
+    return items.map( item => Object.fromEntries(
+      Object.entries(item).map( ([key,val]) =>{
+        if(key.endsWith('コード')){
+          return [key, String(val)]
+        }
+        else if(key.endsWith('リスト')){
+          return [key, val.split(',').map(e=>e.trim())]
+        }
+        else{
+          return [key, val]
+        }
+      })
+    ))
+}
+
+
+////////////////////////
+//      CRUDの関数     //
+////////////////////////
+
+function getRows(sheetName="",query){
+  let {sheet, values, columns, items} = getColumnsAndItemsFromSheet(sheetName)
+
+  // queryがJSONで渡されている場合はパースする
+  try{
+    query = JSON.parse(query)
+  }catch(e){
+
+  }
+
+  if(!query){
+    return items
+  }
+
+  // idが指定されている場合は、早く返すためにfindを使って検索。配列で返す
+  if(query.length===1 && query[0][0]===columns[0]){
+    const [idName,_,idValue] = query[0]
+    const item = items.find(item=>item[idName]==idValue)
+    return item? [item]:[]
+  }
+
+  // それ以外の検索はフィルター検索
+  for(const q of query){
+    const [fieldName,operator,fieldValue] = q
+    
+    if(operator === "=="){
+        items = items.filter(item=>item[fieldName]==fieldValue)
+    }
+    else if(operator === "!="){
+        items = items.filter(item=>item[fieldName]!=fieldValue)
+    }
+    else if(operator === "IN"){
+        if(!Array.isArray(fieldValue))throw `演算子がINですが、fieldValueが配列になっていません。${fieldValue}`
+        arr = fieldValue.map(val=>val.trim())
+        items = items.filter(item=>arr.includes(item[fieldName]))
+    }
+    else if(operator === "NOT IN"){
+        if(!Array.isArray(fieldValue))throw `演算子がNOT INですが、fieldValueが配列になっていません。${fieldValue}`
+        arr = fieldValue.map(val=>val.trim())
+        items = items.filter(item=>!arr.includes(item[fieldName]))
     }
   }
 
-  return JSON.stringify(items)
+  return items
 }
 
+/**
+ * データを渡すと、idを付与して返します
+ */
 function addRows(sheetName="",rows=[]){
+  // パースとスプレッドシート用にデータ変換
+  try{
+    rows = JSON.parse(rows)    
+  }catch(e){
+
+  }finally{
+    rows = formatterToSpreadsheet(rows)
+  }
+
   try{
     lock.waitLock(10000)
-    const spreadsheetId = sheetName.includes('マスタ')? マスタspreadsheetId:トランザクションspreadsheetId 
+    const {sheet, values, columns, items} = getColumnsAndItemsFromSheet(sheetName)
 
-    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName)
+    const codeList = values.map(row=>String(row[0]))
+    const lastCode = codeList.sort().at(-1)
+    const prefix = lastCode.match(/^\D+/) ? lastCode.match(/^\D+/)[0] : ""
+    const suffix = Number(lastCode.match(/\d+$/)[0])
 
-    const columns = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues().pop()
-
-    const newRows = rows.map(row=>columns.map(colName=>{
-      return colName==='Row ID'? Utilities.getUuid():row[colName]
+    const newRows = rows.map((row,idx)=>columns.map((colName,i)=>{
+      if(i===0){
+        const code = prefix+ String( suffix + i + 1)        
+        return code
+      }else{
+        return row[colName]
+      }
     }))
     
     sheet.getRange(sheet.getLastRow()+1,1,rows.length,columns.length).setValues(newRows)
 
-    const items = newRows.map(row=>columns.reduce((item,colName,idx)=>Object.assign(item,{[colName]:row[idx]}),{}))
+    const newItems = newRows.map(row=>columns.reduce((item,colName,idx)=>Object.assign(item,{[colName]:row[idx]}),{}))
 
-    return {Rows:JSON.stringify(items)}    
+    return formatterToJS(newItems)
+
   }catch(err){
     throw(sheetName,'updateRows', err)
+
   }finally{
     lock.releaseLock()
   }
 }
 
-function updateRows(sheetName="",rows=[{'Row ID':""}]){
+/** 
+ * IDがあれば更新、なければ追加
+ * 強制的に書き込みします。updateと違って設定されていないフィールドの値はundefinedになります
+*/
+function setRows(sheetName="",rows=[]){
+  // パースとバリデーション
   try{
-    lock.waitLock(10000)
+    rows = JSON.parse(rows)
+    if(rows.some(row=>!row[codeName])){
+      throw "コードが設定されていないレコードがあります"
+    }      
+  }catch(e){
+
+  }finally{
+    rows = formatterToSpreadsheet(rows)  
+  }
+
+  try{
+    // データの取得
+    lock.waitLock(10000)    
+    const {sheet, values, columns, items} = getColumnsAndItemsFromSheet(sheetName)
+
+    const codeName = columns[0] // 例：""品目コード"
+    
+    const codeSet = new Set(values.map(v=>String(v[0])))
+
+    // 書き込み
+    const newRows = rows.map(row=>{
+      const code = String(row[codeName])
+
+      let newRow
+
+      if(codeSet.has(code)){
+        const index = items.findIndex(item=>item[codeName] == row[codeName])
+        newRow = columns.map(colName=> row[colName])        
+        sheet.getRange(index+2,1,1,columns.length).setValues([newRow])
+      }
+      else{
+        row['作成日時'] = new Date()
+        newRow = columns.map(colName=> row[colName])
+        sheet.appendRow(newRow)
+      }
+
+      return newRow
+    })
+
+    const newItems = newRows.map(row=>columns.reduce((item,colName,idx)=>Object.assign(item,{[colName]:row[idx]}),{}))
+
+    return formatterToJS(newItems)
+
+  }catch(err){
+    throw(sheetName,'updateRows', err)
+
+  }finally{
+    lock.releaseLock()
+  }
+}
+
+function updateRows(sheetName="",rows=[]){
+  // パースとスプレッドシート用にデータ変換
+  try{
+    rows = JSON.parse(rows)    
+  }catch(e){
+
+  }finally{
+    rows = formatterToSpreadsheet(rows)
+  }
+
+  // データ取得
+  lock.waitLock(10000)  
+  const {sheet, values, columns, items} = getColumnsAndItemsFromSheet(sheetName)
+  const idName = columns[0]  
   
-    const spreadsheetId = sheetName.includes('マスタ')? マスタspreadsheetId:トランザクションspreadsheetId 
+  try{
+    // データ書き込み
+    const updatedItems = items.flatMap((item,i)=>{
+      const row = rows.find(row=>row[idName]==item[idName])
 
-    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName)
-
-    const values = sheet.getDataRange().getValues()
-
-    const columns = values.shift()
-
-    const items = values.map(row=>columns.reduce((item,colName,idx)=>Object.assign(item,{[colName]:row[idx]}),{}))
-
-    const res = items.flatMap((item,i)=>{
-      const row = rows.find(row=>row['Row ID']===item['Row ID'])
       if(row){
         const newItem = Object.assign(item,row)
-        const newRow = columns.map(colName=>newItem[colName])
+        const newRow = columns.map(colName=> newItem[colName] )
         sheet.getRange(i+2,1,1,columns.length).setValues([newRow])
         return [newItem]
       }else{
@@ -88,33 +266,60 @@ function updateRows(sheetName="",rows=[{'Row ID':""}]){
       }
     })
 
-    return {Rows:JSON.stringify(res)}
+    return formatterToJS(updatedItems)
+
   }catch(err){
+    rollback(sheet, [columns, ...values])
     throw(sheetName,'updateRows', err)
+    
   }finally{
     lock.releaseLock()
   }
 }
 
 function deleteRows(sheetName="",rows=[]){
+  // jsonの場合はパース
   try{
-    lock.waitLock(1000)
-    const spreadsheetId = sheetName.includes('マスタ')? マスタspreadsheetId:トランザクションspreadsheetId 
+    rows = JSON.parse(rows)
+  }catch{
 
-    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName)
+  }
 
-    const rowIDs = sheet.getRange(1,1,sheet.getLastRow(),1).getValues().flatMap(cell=>cell)
+  lock.waitLock(1000) 
+  const {sheet, values, columns, items} = getColumnsAndItemsFromSheet(sheetName)
+  const idName = columns[0]
 
-    rows.forEach(row=>{
-      const targetIndex = rowIDs.findIndex(rowID=>row['Row ID']===rowID)
+  try{
+    // 消すアイテムが一つのときはdeleteRowを使う
+    if(rows.length===1){
+      const row = rows[0]
+      const targetIndex = items.findIndex(item=>row[idName] == item[idName])
       if(targetIndex>0){
-        sheet.deleteRow(targetIndex+1)
+        sheet.deleteRow(targetIndex+2)
+        const deletedItem = items[targetIndex]
+        return [deletedItem]
+      }else{
+        return []
       }
-    })
+    }
+    // 複数のときは、filter処理して全て書き換える
+    else{
+      const targetCodeList = rows.map(row=>row[idName])
+      const filteredItems = items.filter(item=>!targetCodeList.includes(item[idName]))
 
-    return {Rows:JSON.stringify(rows)}    
+      const newValues = formatterToSpreadsheet(filteredItems).map(item=>columns.map(colName=>item[colName]))
+      newValues.unshift(columns)
+      sheet.clear()
+      sheet.getRange(1,1,newValues.length,columns.length).setValues(newValues)
+
+      const deletedItems = items.filter(item=>targetCodeList.includes(item[idName]))
+      return deletedItems
+    }
+
   }catch(err){
-    throw(sheetName,'updateRows', err)
+    rollback(sheet, [columns, ...values])
+    throw(sheetName,'deleteRows', err)
+
   }finally{
     lock.releaseLock()
   }
